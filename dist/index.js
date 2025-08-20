@@ -4327,3 +4327,17 @@ function writeYamlBlock(md, data) {
 0 && (0);
 
 
+    try {
+        await fs.access(full);
+    }
+    catch {
+        throw new Error(`Config file not found: ${full}`);
+    }
+        if (!process.env.VERCEL_TOKEN) {
+            core.info("VERCEL_TOKEN not set; Vercel features disabled");
+        }
+        if (!process.env.OPENAI_API_KEY) {
+            core.info("OPENAI_API_KEY not set; LLM features disabled");
+        }
+                VERCEL_TOKEN: process.env.VERCEL_TOKEN || "",
+                OPENAI_API_KEY: process.env.OPENAI_API_KEY || ""

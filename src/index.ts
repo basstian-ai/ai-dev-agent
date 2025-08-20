@@ -7,6 +7,11 @@ import { runAgent } from "./agent/runAgent";
 
 async function loadConfig(relPath: string): Promise<Record<string, any>> {
   const full = path.resolve(process.cwd(), relPath);
+  try {
+    await fs.access(full);
+  } catch {
+    throw new Error(`Config file not found: ${full}`);
+  }
   const raw = await fs.readFile(full, "utf8");
   return yaml.load(raw) as Record<string, any>;
 }
@@ -19,6 +24,13 @@ async function main() {
 
     const token = process.env.GITHUB_TOKEN || "";
     if (!token) throw new Error("GITHUB_TOKEN is required");
+
+    if (!process.env.VERCEL_TOKEN) {
+      core.info("VERCEL_TOKEN not set; Vercel features disabled");
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      core.info("OPENAI_API_KEY not set; LLM features disabled");
+    }
 
     const { owner, repo } = github.context.repo;
     const cfg = await loadConfig(configPath);
@@ -33,7 +45,8 @@ async function main() {
       workspace: process.cwd(),
       env: {
         ...process.env,
-        VERCEL_TOKEN: process.env.VERCEL_TOKEN || ""
+        VERCEL_TOKEN: process.env.VERCEL_TOKEN || "",
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || ""
       } as Record<string, string>
     });
 
