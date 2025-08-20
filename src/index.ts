@@ -1,36 +1,45 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
+import * as fs from "fs/promises";
+import * as path from "path";
+import yaml from "js-yaml";
+import { runAgent } from "./agent/runAgent";
 
-async function run() {
-  try {
-    const config = core.getInput("config") || ".ai/agent.yml";
-    const repairOnly = core.getInput("repair-only") === "true";
-    const maxDiff = core.getInput("max-diff-lines") || "400";
-const octokit = github.getOctokit(process.env.GITHUB_TOKEN || "");
-
-const { owner, repo } = github.context.repo;
-
-const issues = await octokit.rest.issues.listForRepo({
-  owner,
-  repo,
-  state: "open",
-  per_page: 3,
-});
-
-core.info(`Found ${issues.data.length} open issues in ${owner}/${repo}`);
-
-    core.info("AI Dev Agent running…");
-    core.info(JSON.stringify({
-      repo: github.context.repo,
-      config,
-      repairOnly,
-      maxDiff
-    }, null, 2));
-
-    // 🔮 Later: add real orchestrator code here
-  } catch (error: any) {
-    core.setFailed(error.message);
-  }
+async function loadConfig(relPath: string): Promise<Record<string, any>> {
+  const full = path.resolve(process.cwd(), relPath);
+  const raw = await fs.readFile(full, "utf8");
+  return yaml.load(raw) as Record<string, any>;
 }
 
-run();
+async function main() {
+  try {
+    const configPath   = core.getInput("config") || ".ai/agent.yml";
+    const repairOnly   = core.getInput("repair-only") === "true";
+    const maxDiffLines = parseInt(core.getInput("max-diff-lines") || "400", 10);
+
+    const token = process.env.GITHUB_TOKEN || "";
+    if (!token) throw new Error("GITHUB_TOKEN is required");
+
+    const { owner, repo } = github.context.repo;
+    const cfg = await loadConfig(configPath);
+
+    const octokit = github.getOctokit(token);
+    await runAgent({
+      octokit,
+      owner, repo,
+      cfg,
+      repairOnly,
+      maxDiffLines,
+      workspace: process.cwd(),
+      env: {
+        ...process.env,
+        VERCEL_TOKEN: process.env.VERCEL_TOKEN || ""
+      } as Record<string, string>
+    });
+
+    core.info("Agent completed.");
+  } catch (e: any) {
+    core.setFailed(e?.stack || String(e));
+  }
+}
+main();
