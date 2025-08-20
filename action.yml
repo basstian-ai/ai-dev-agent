@@ -1,19 +1,18 @@
-name: AI Dev Agent
-description: "Run the AI Dev Agent on the current repository"
-branding: { icon: robot, color: blue }
+name: "AI Dev Agent"
+description: "Autonomous dev agent that fixes builds and develops features"
 inputs:
   config:
-    description: "Path to .ai/agent.yml"
+    description: "Path to agent config file"
     required: false
     default: ".ai/agent.yml"
   repair-only:
-    description: "Only attempt repairs"
+    description: "Only run repair loop (skip feature work)"
     required: false
     default: "false"
   max-diff-lines:
-    description: "Cap on total added+removed lines"
+    description: "Maximum diff size to commit"
     required: false
     default: "400"
 runs:
-  using: node20
-  main: dist/index.js
+  using: "node20"
+  main: "dist/index.js"
