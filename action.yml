@@ -1,9 +1,9 @@
-name: AI Dev Agent (composite)
-description: "Quickstart wrapper for AI Dev Agent"
+name: AI Dev Agent
+description: "Run the AI Dev Agent on the current repository"
 branding: { icon: robot, color: blue }
 inputs:
   config:
-    description: "Path to .ai/agent.yml in target repo"
+    description: "Path to .ai/agent.yml"
     required: false
     default: ".ai/agent.yml"
   repair-only:
@@ -15,14 +15,5 @@ inputs:
     required: false
     default: "400"
 runs:
-  using: "composite"
-  steps:
-    - name: Show inputs (dummy run)
-      shell: bash
-      run: |
-        echo "AI Dev Agent quickstart"
-        echo "config=${{ inputs.config }}"
-        echo "repair-only=${{ inputs.repair-only }}"
-        echo "max-diff-lines=${{ inputs.max-diff-lines }}"
-        echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
-        echo "This is a placeholder. It proves the action wiring works."
+  using: node20
+  main: dist/index.js
