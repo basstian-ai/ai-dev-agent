@@ -1,16 +1,17 @@
-name: "AI Dev Agent"
+name: AI Dev Agent
 description: "Autonomous dev agent that fixes builds and develops features"
+branding: { icon: robot, color: blue }
 inputs:
   config:
     description: "Path to agent config file"
     required: false
     default: ".ai/agent.yml"
   repair-only:
-    description: "Only run repair loop (skip feature work)"
+    description: "Only attempt repairs"
     required: false
     default: "false"
   max-diff-lines:
-    description: "Maximum diff size to commit"
+    description: "Max diff size to commit"
     required: false
     default: "400"
 runs:
