@@ -1,0 +1,21 @@
+{
+  "name": "ai-dev-agent",
+  "version": "1.0.0",
+  "description": "**Dummy JavaScript Action (no external deps).**   It echoes inputs so you can wire TARGET_REPOs.   Later, swap `dist/index.js` for a bundled build that includes your real logic.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@vercel/ncc": "^0.38.3",
+    "typescript": "^5.9.2"
+  }
+}
