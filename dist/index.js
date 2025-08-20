@@ -29963,26 +29963,25 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
-async function main() {
+async function run() {
     try {
-        const configPath = core.getInput("config") || ".ai/agent.yml";
+        const config = core.getInput("config") || ".ai/agent.yml";
         const repairOnly = core.getInput("repair-only") === "true";
-        const maxDiffLines = parseInt(core.getInput("max-diff-lines") || "400", 10);
-        const ghToken = process.env.GITHUB_TOKEN;
-        if (!ghToken)
-            throw new Error("GITHUB_TOKEN env var is required");
-        const octokit = github.getOctokit(ghToken);
-        // No-op API call just to prove Octokit works. Replace with real logic later.
-        const { owner, repo } = github.context.repo;
-        await octokit.rest.repos.get({ owner, repo });
-        core.info(`Agent ready. config=${configPath} repairOnly=${repairOnly} maxDiff=${maxDiffLines}`);
-        core.setOutput("pr-number", "0");
+        const maxDiff = core.getInput("max-diff-lines") || "400";
+        core.info("AI Dev Agent running…");
+        core.info(JSON.stringify({
+            repo: github.context.repo,
+            config,
+            repairOnly,
+            maxDiff
+        }, null, 2));
+        // 🔮 Later: add real orchestrator code here
     }
-    catch (e) {
-        core.setFailed(e?.stack || String(e));
+    catch (error) {
+        core.setFailed(error.message);
     }
 }
-main();
+run();
 
 
 /***/ }),
