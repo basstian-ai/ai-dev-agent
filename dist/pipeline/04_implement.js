@@ -2,8 +2,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import * as cp from 'child_process';
 import { promisify } from 'util';
-import https from 'https';
 import crypto from 'crypto';
+import { chatJSON } from '../util/llm.js';
 const run = promisify(cp.exec);
 function sh(cmd) { cp.execSync(cmd, { stdio: 'inherit' }); }
 function rand(n = 4) { return crypto.randomBytes(n).toString("hex"); }
@@ -25,29 +25,17 @@ function uniqueBranch(base) {
     }
     return name;
 }
-async function callOpenAI(prompt, key) {
-    return new Promise((resolve, reject) => {
-        const data = JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] });
-        const req = https.request('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }
-        }, res => {
-            let body = '';
-            res.on('data', d => body += d);
-            res.on('end', () => {
-                try {
-                    const j = JSON.parse(body);
-                    resolve(JSON.parse(j.choices?.[0]?.message?.content || '[]'));
-                }
-                catch (e) {
-                    reject(e);
-                }
-            });
-        });
-        req.on('error', reject);
-        req.write(data);
-        req.end();
+async function llmPatchPlan(prompt, apiKey) {
+    const json = await chatJSON({
+        apiKey,
+        messages: [{
+                role: 'user',
+                content: `Return JSON: { "plan": [ { "path": "pages/api/....js", "action":"add|edit", "content": "<file content>" }, ... ] }
+Only include files under pages/**, lib/**, src/**. Keep changes minimal.`
+            }],
+        fallback: { plan: [] }
     });
+    return json.plan ?? [];
 }
 export async function implement() {
     const tasksPath = path.join('.ai', 'backlog', 'tasks.md');
@@ -94,7 +82,9 @@ export async function implement() {
         }
         else if (process.env.OPENAI_API_KEY) {
             const prompt = `Task: ${line}\nProvide minimal JSON plan [{"path","action","content"}]`;
-            const plan = await callOpenAI(prompt, process.env.OPENAI_API_KEY);
+            const plan = await llmPatchPlan(prompt, process.env.OPENAI_API_KEY);
+            if (!plan.length)
+                console.log('implement: empty plan', plan);
             for (const step of plan) {
                 if (!step.path || !/^((pages|lib|src)\/)/.test(step.path))
                     continue;
