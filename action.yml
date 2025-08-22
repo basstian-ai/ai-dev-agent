@@ -1,5 +1,5 @@
-name: AI Dev Agent
-description: "Autonomous dev agent that fixes builds and develops features"
+name: "AI Dev Agent"
+description: "Full loop: collect Vercel signals → suggestions → prioritize → implement → PR"
 branding: { icon: robot, color: blue }
 inputs:
   config:
