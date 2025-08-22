@@ -1,34 +1,10 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import https from 'https';
+import { chatJSON } from '../util/llm.js';
 
 async function readLines(p: string): Promise<string[]> {
   const text = await fs.readFile(p, 'utf8').catch(() => '');
   return text.split('\n').filter(Boolean);
-}
-
-function callOpenAI(prompt: string, key: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] });
-    const req = https.request('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }
-    }, res => {
-      let body = '';
-      res.on('data', d => body += d);
-      res.on('end', () => {
-        try {
-          const j = JSON.parse(body);
-          resolve(j.choices?.[0]?.message?.content || '');
-        } catch (e) {
-          reject(e);
-        }
-      });
-    });
-    req.on('error', reject);
-    req.write(data);
-    req.end();
-  });
 }
 
 export async function prioritize() {
@@ -37,13 +13,25 @@ export async function prioritize() {
   const vision = await fs.readFile(path.join('.ai','roadmap','vision.md'),'utf8').catch(()=> '');
   const existing = await readLines(path.join('.ai','backlog','tasks.md'));
   const done = existing.filter(l => l.startsWith('- [x]'));
-  const key = process.env.OPENAI_API_KEY;
+  const key = process.env.OPENAI_API_KEY || '';
   let tasks: string[] = [];
   if (key) {
-    const prompt = `Vision:\n${vision}\n\nSuggestions:\n${newSug.join('\n')}\n\nBugs:\n${bugs.join('\n')}\n\n` +
-      `Return 6-10 tasks in format - [ ] T-xxx (P1|P2|P3): <title> — link:S-xxx/B-xxx — rationale. Bugs blocking build/runtime are P1 at top.`;
-    const resp = await callOpenAI(prompt, key);
-    tasks = resp.split('\n').map(l => l.trim()).filter(l => l.startsWith('- ['));
+    const json = await chatJSON<{ tasks: string[] }>({
+      apiKey: key,
+      messages: [{
+        role: 'user',
+        content:
+`Given bugs and suggestions, return JSON:
+{ "tasks": [
+  "- [ ] T-### (P1|P2|P3): <title> — link:S-###/B-### — rationale",
+  ...
+]}
+Rules: P1 for build/runtime breakers; keep each task small/safe; 6-10 items. No prose.`
+      }],
+      fallback: { tasks: [] }
+    });
+    tasks = json.tasks ?? [];
+    if (!tasks.length) console.log('prioritize: empty tasks', json);
   } else {
     for (const b of bugs) {
       const id = (b.match(/B-([a-f0-9]+)/)||[])[1];

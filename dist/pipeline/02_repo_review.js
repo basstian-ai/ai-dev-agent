@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import https from 'https';
+import { chatJSON } from '../util/llm.js';
 async function readFileSafe(p) {
     return fs.readFile(p, 'utf8').catch(() => '');
 }
@@ -18,30 +18,6 @@ async function listFiles(dir, root, acc) {
             acc.push(rel);
     }
 }
-function callOpenAI(prompt, key) {
-    return new Promise((resolve, reject) => {
-        const data = JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] });
-        const req = https.request('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }
-        }, res => {
-            let body = '';
-            res.on('data', d => body += d);
-            res.on('end', () => {
-                try {
-                    const json = JSON.parse(body);
-                    resolve(json.choices?.[0]?.message?.content || '');
-                }
-                catch (e) {
-                    reject(e);
-                }
-            });
-        });
-        req.on('error', reject);
-        req.write(data);
-        req.end();
-    });
-}
 export async function repoReview() {
     const vision = await readFileSafe(path.join('.ai', 'roadmap', 'vision.md'));
     const tasks = await readFileSafe(path.join('.ai', 'backlog', 'tasks.md'));
@@ -49,13 +25,26 @@ export async function repoReview() {
     const files = [];
     await listFiles('.', '.', files);
     const fileList = files.slice(0, 40).join('\n');
-    let suggestions = [];
-    const key = process.env.OPENAI_API_KEY;
+    let ideas = [];
+    const key = process.env.OPENAI_API_KEY || '';
     if (key) {
-        const prompt = `Vision:\n${vision}\n\nDone:\n${done.join('\n')}\n\nFiles:\n${fileList}\n\n` +
-            `Provide 5-8 single-line suggestions in format S-xxx: <short title> — rationale.`;
-        const resp = await callOpenAI(prompt, key);
-        suggestions = resp.split('\n').map(l => l.trim()).filter(l => l.startsWith('S-'));
+        const json = await chatJSON({
+            apiKey: key,
+            messages: [{
+                    role: 'user',
+                    content: `Return JSON with key "ideas": an array of 5-8 items.
+Each item: { "id": "S-###", "title": "<short>", "rationale": "<one sentence>" }.
+No prose. Use S-101, S-102, ... sequentially.`
+                }],
+            fallback: { ideas: [] }
+        });
+        ideas = json.ideas ?? [];
+        if (!ideas.length)
+            console.log('repoReview: empty ideas', json);
+    }
+    let suggestions = [];
+    if (ideas.length) {
+        suggestions = ideas.map(i => `${i.id}: ${i.title} — ${i.rationale}`);
     }
     else {
         suggestions = [
