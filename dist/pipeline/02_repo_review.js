@@ -8,7 +8,7 @@ async function listFiles(dir, root, acc) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const e of entries) {
         const rel = path.relative(root, path.join(dir, e.name));
-        if (rel.startsWith('.ai') || rel.startsWith('.github'))
+        if (rel.startsWith('.ai') || rel.startsWith('.github') || rel.startsWith('node_modules'))
             continue;
         if (acc.length >= 40)
             break;
