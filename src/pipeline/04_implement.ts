@@ -40,6 +40,10 @@ export async function implement() {
   const lower = line.toLowerCase();
   const changed: string[] = [];
   try {
+    const hasNodeModules = await fs.access('node_modules').then(() => true).catch(() => false);
+    if (!hasNodeModules) {
+      try { await run('npm ci'); } catch { await run('npm i'); }
+    }
     if (lower.includes('health')) {
       const file = path.join('pages','api','health.js');
       await fs.mkdir(path.dirname(file), {recursive:true});
@@ -72,7 +76,8 @@ export async function implement() {
     await fs.writeFile(tasksPath, lines.join('\n'), 'utf8');
     const branch = `agent/${id}`;
     await run(`git checkout -b ${branch}`);
-    await run(`git add ${tasksPath} ${changed.join(' ')}`);
+    const addFiles = [tasksPath, ...changed].join(' ');
+    await run(`git add ${addFiles}`);
     await run(`git commit -m "AI Agent: ${id} ${title}"`);
     await run(`git push origin HEAD`);
     const tmpl = await fs.readFile(path.join('.ai','templates','pr-template.md'),'utf8').catch(()=> '');

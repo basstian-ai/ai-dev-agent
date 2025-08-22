@@ -20,7 +20,7 @@ function getJSON(url, token) {
     });
 }
 async function appendBug(kind, msg, source) {
-    const hash = createHash('sha1').update(msg).digest('hex').slice(0, 7);
+    const hash = createHash('sha1').update(msg).digest('hex').slice(0, 8);
     const line = `- [ ] B-${hash}: ${kind} - ${msg} | source:${source} | firstSeen:${new Date().toISOString()} | occurrences:1`;
     const file = path.join('.ai', 'backlog', 'bugs.md');
     await fs.mkdir(path.dirname(file), { recursive: true });
@@ -34,8 +34,10 @@ export async function collectSignals() {
     const token = process.env.VERCEL_TOKEN;
     const project = process.env.VERCEL_PROJECT_ID;
     const team = process.env.VERCEL_TEAM_ID || process.env.VERCEL_ORG_ID;
-    if (!token || !project)
+    if (!token || !project) {
+        console.log('Missing Vercel env vars, skipping collectSignals');
         return;
+    }
     const teamParam = team ? `&teamId=${team}` : '';
     const url = `https://api.vercel.com/v6/deployments?projectId=${project}&limit=1${teamParam}`;
     const data = await getJSON(url, token).catch(() => null);
@@ -47,14 +49,15 @@ export async function collectSignals() {
     }
     if (dep.url) {
         await new Promise(resolve => {
-            https.get(`https://${dep.url}`, res => {
+            const url = `https://${dep.url}`;
+            https.get(url, res => {
                 if ((res.statusCode || 0) >= 500) {
-                    appendBug('Runtime error', `status ${res.statusCode}`, 'runtime').then(() => resolve());
+                    appendBug('Runtime issue', `hitting ${url}, status ${res.statusCode}`, 'runtime').then(() => resolve());
                 }
                 else
                     resolve();
             }).on('error', () => {
-                appendBug('Runtime error', 'no response', 'runtime').then(() => resolve());
+                appendBug('Runtime issue', `hitting ${url}, no response`, 'runtime').then(() => resolve());
             });
         });
     }
