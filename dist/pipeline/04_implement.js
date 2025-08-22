@@ -1,9 +1,30 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
+import * as cp from 'child_process';
 import { promisify } from 'util';
 import https from 'https';
-const run = promisify(exec);
+import crypto from 'crypto';
+const run = promisify(cp.exec);
+function sh(cmd) { cp.execSync(cmd, { stdio: 'inherit' }); }
+function rand(n = 4) { return crypto.randomBytes(n).toString("hex"); }
+function remoteBranchExists(name) {
+    try {
+        cp.execSync(`git ls-remote --exit-code --heads origin ${name}`, { stdio: "ignore" });
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+function uniqueBranch(base) {
+    let name = base;
+    let tries = 0;
+    while (remoteBranchExists(name) && tries < 5) {
+        name = `${base}-${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 12)}-${rand(2)}`;
+        tries++;
+    }
+    return name;
+}
 async function callOpenAI(prompt, key) {
     return new Promise((resolve, reject) => {
         const data = JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] });
@@ -88,28 +109,30 @@ export async function implement() {
         await run('npm run build');
         lines[idx] = line.replace('- [ ]', '- [x]');
         await fs.writeFile(tasksPath, lines.join('\n'), 'utf8');
-        const branch = `agent/${id}`;
-        await run(`git checkout -b ${branch}`);
         const addFiles = [tasksPath, ...changed].join(' ');
-        await run(`git add ${addFiles}`);
-        await run(`git commit -m "AI Agent: ${id} ${title}"`);
-        await run(`git push origin HEAD`);
         const tmpl = await fs.readFile(path.join('.ai', 'templates', 'pr-template.md'), 'utf8').catch(() => '');
         const body = tmpl.replace('{{id}}', id).replace('{{title}}', title);
-        const repo = process.env.GITHUB_REPOSITORY || '';
-        const token = process.env.GITHUB_TOKEN || '';
-        const [owner, repoName] = repo.split('/');
-        if (owner && repoName && token) {
-            const post = JSON.stringify({ title: `AI Agent: ${id} ${title}`, head: branch, base: 'main', body });
-            await new Promise((resolve, reject) => {
-                const req = https.request(`https://api.github.com/repos/${owner}/${repoName}/pulls`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'User-Agent': 'ai-agent' }
-                }, res => { res.on('data', () => { }); res.on('end', resolve); });
-                req.on('error', reject);
-                req.write(post);
-                req.end();
-            });
+        sh(`git fetch origin --prune`);
+        const baseBranch = `agent/${id.toLowerCase()}`;
+        const branch = uniqueBranch(baseBranch);
+        try {
+            sh(`git checkout -B ${branch}`);
+        }
+        catch {
+            sh(`git checkout -b ${branch}`);
+        }
+        sh(`git add ${addFiles}`);
+        sh(`git -c user.email=actions@github.com -c user.name="github-actions[bot]" commit -m "feat(${id}): ${title}" || true`);
+        const pushCmd = remoteBranchExists(baseBranch) && branch === baseBranch
+            ? `git push -u origin ${branch} --force-with-lease`
+            : `git push -u origin ${branch}`;
+        sh(pushCmd);
+        const prTitle = `AI Agent: ${id} ${title}`;
+        try {
+            sh(`gh pr create --base main --head ${branch} --title "${prTitle}" --body '${body.replace(/'/g, "'\\''")}'`);
+        }
+        catch {
+            console.log("gh failed; PR may already exist or auto-merge disabled.");
         }
     }
     catch (e) {
