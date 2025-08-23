@@ -1,12 +1,13 @@
 {
   "name": "ai-dev-agent",
-  "version": "1.0.1",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "scripts": {
-    "build": "tsc"
+  "bin": {
+    "ai-dev-agent": "./cli.js"
   },
-  "devDependencies": {
-    "@types/node": "^24.3.0",
-    "typescript": "^5.4.0"
-  }
+  "scripts": {
+    "start": "node cli.js"
+  },
+  "dependencies": {}
 }
